@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dice and Decks</title>
+<style>
+  :root { color-scheme:dark; --glow:#4FD8FF; --text:#e8e6f5; --dim:#9b96bd;
+          --crit:#8fe3a1; --fumble:#ff7a6b; --red:#e35d6a; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; padding:26px 20px;
+    background:radial-gradient(circle at 50% 0%, #16132a, #0a0813 65%);
+    color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:23px; }
+  .lede { color:var(--dim); margin:0 0 20px; font-size:14.5px; line-height:1.6; max-width:64ch; }
+  .tabs { display:flex; gap:0; margin-bottom:18px; }
+  .tabs button { padding:9px 18px; background:transparent; color:var(--dim); border:0;
+    box-shadow:inset 0 -2px 0 rgba(255,255,255,.1); font-size:14px; cursor:pointer; font-family:inherit; }
+  .tabs button[aria-selected=true] { color:var(--glow); box-shadow:inset 0 -2px 0 var(--glow); }
+  .card { background:linear-gradient(155deg,#16132a,#0c0a16); padding:22px;
+    box-shadow:inset 0 0 0 1px rgba(79,216,255,.18);
+    clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%); }
+  input { width:100%; padding:12px 14px; background:#07060f; color:var(--text);
+    border:1px solid rgba(255,255,255,.12); font-family:Consolas,monospace; font-size:17px; }
+  input:focus { outline:2px solid var(--glow); outline-offset:-1px; }
+  .quick { display:flex; flex-wrap:wrap; gap:7px; margin:13px 0; }
+  .quick button { padding:6px 12px; background:transparent; color:var(--glow); border:0;
+    box-shadow:inset 0 0 0 1px rgba(79,216,255,.35); font-size:12.5px; cursor:pointer;
+    font-family:Consolas,monospace; }
+  .total { font-family:Consolas,monospace; font-size:46px; line-height:1.1; margin:16px 0 4px; }
+  .total.crit { color:var(--crit); } .total.fumble { color:var(--fumble); }
+  .detail { color:var(--dim); font-size:13.5px; line-height:1.7; font-family:Consolas,monospace; }
+  .kept { color:var(--text); } .dropped { text-decoration:line-through; opacity:.45; }
+  .verdict { margin-top:10px; font-size:14px; font-weight:600; }
+  .log { margin-top:20px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);
+    font-family:Consolas,monospace; font-size:12.5px; color:var(--dim); line-height:1.9;
+    max-height:170px; overflow:auto; }
+  .err { color:var(--fumble); font-size:13.5px; }
+  .cards { display:flex; flex-wrap:wrap; gap:9px; margin:16px 0; min-height:96px; }
+  .pc { width:62px; height:90px; background:#f4f2ff; color:#14121f; display:grid;
+    place-items:center; font-size:19px; font-weight:600; position:relative;
+    clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%); }
+  .pc.red { color:var(--red); }
+  .pc small { position:absolute; top:5px; left:6px; font-size:11px; }
+  .row { display:flex; gap:9px; flex-wrap:wrap; margin-top:6px; }
+  .row button { padding:9px 15px; background:var(--glow); color:#07222b; border:0;
+    font-weight:600; font-size:13.5px; cursor:pointer; font-family:inherit;
+    clip-path:polygon(0 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%); }
+  .row button.quiet { background:transparent; color:var(--glow);
+    box-shadow:inset 0 0 0 1px rgba(79,216,255,.4); }
+  .count { color:var(--dim); font-size:13px; margin-top:10px; }
+  .help { font-size:12.5px; color:var(--dim); line-height:1.85; margin-top:16px;
+    padding-top:13px; border-top:1px solid rgba(255,255,255,.08); }
+  code { font-family:Consolas,monospace; color:#bfe9f7; background:rgba(79,216,255,.1); padding:1px 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Dice and Decks</h1>
+  <p class="lede">For the nights when the dice are in the other room. Proper
+     notation, shown working — you can see every die, not just the total.</p>
+
+  <div class="tabs" role="tablist">
+    <button id="tabDice" role="tab" aria-selected="true">Dice</button>
+    <button id="tabCards" role="tab" aria-selected="false">Cards</button>
+  </div>
+
+  <div class="card" id="dicePanel">
+    <input id="expr" value="4d6kh3" spellcheck="false" aria-label="Dice expression">
+    <div class="quick" id="quick"></div>
+    <div class="total" id="total">—</div>
+    <div class="detail" id="detail"></div>
+    <div class="verdict" id="verdict"></div>
+    <div class="log" id="log"></div>
+    <div class="help">
+      <code>3d6+2</code> three six-sided dice plus two &nbsp;·&nbsp;
+      <code>4d6kh3</code> roll four, keep the highest three &nbsp;·&nbsp;
+      <code>2d20kl1</code> keep the lowest &nbsp;·&nbsp;
+      <code>d20adv</code> advantage &nbsp;·&nbsp; <code>d20dis</code> disadvantage &nbsp;·&nbsp;
+      <code>4d6!</code> exploding — a maximum roll rolls again
+    </div>
+  </div>
+
+  <div class="card" id="cardsPanel" hidden>
+    <div class="cards" id="hand"></div>
+    <div class="row">
+      <button id="draw1">Draw one</button>
+      <button id="draw5">Draw five</button>
+      <button class="quiet" id="shuffle">Shuffle a fresh deck</button>
+      <button class="quiet" id="jokers">Jokers: off</button>
+    </div>
+    <div class="count" id="count"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Rejection sampling rather than `% n`. Modulo on a uniform 32-bit value
+// biases the low faces - tiny, but free to avoid, and this is a dice roller.
+function roll(sides) {
+  const limit = Math.floor(0xFFFFFFFF / sides) * sides;
+  const buf = new Uint32Array(1);
+  let v;
+  do { crypto.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+  return (v % sides) + 1;
+}
+
+/**
+ * Parse dice notation. Returns { dice, sides, keep, mode, explode, modifier }
+ * or throws with a message a person can act on.
+ */
+function parse(text) {
+  const s = text.trim().toLowerCase().replace(/\s+/g, "");
+  if (!s) throw new Error("Type something like 2d6+1.");
+
+  let mode = null;
+  let body = s;
+  if (body.endsWith("adv")) { mode = "adv"; body = body.slice(0, -3); }
+  else if (body.endsWith("dis")) { mode = "dis"; body = body.slice(0, -3); }
+
+  const m = body.match(/^(\d*)d(\d+)(?:(kh|kl)(\d+))?(!)?([+-]\d+)?$/);
+  if (!m) throw new Error(`Cannot read "${text}". Try 2d6, 4d6kh3, d20adv or 3d8+2.`);
+
+  const dice = m[1] ? parseInt(m[1], 10) : 1;
+  const sides = parseInt(m[2], 10);
+  if (sides < 2) throw new Error("A die needs at least two sides.");
+  if (dice < 1 || dice > 200) throw new Error("Between 1 and 200 dice, please.");
+
+  return {
+    dice: mode ? 2 : dice,
+    sides,
+    keep: m[4] ? parseInt(m[4], 10) : (mode ? 1 : null),
+    keepHigh: mode === "adv" ? true : mode === "dis" ? false : m[3] !== "kl",
+    explode: !!m[5],
+    modifier: m[6] ? parseInt(m[6], 10) : 0,
+    mode,
+  };
+}
+
+function evaluate(spec) {
+  let rolls = [];
+  for (let i = 0; i < spec.dice; i++) {
+    let v = roll(spec.sides);
+    rolls.push({ value: v, exploded: false });
+    // Exploding: a maximum face rolls again. Capped so a d2! cannot loop
+    // forever on a run of maximums.
+    let chain = 0;
+    while (spec.explode && v === spec.sides && chain < 20) {
+      v = roll(spec.sides);
+      rolls.push({ value: v, exploded: true });
+      chain++;
+    }
+  }
+
+  let kept = rolls.map((r, i) => ({ ...r, index: i, keep: true }));
+  if (spec.keep && spec.keep < rolls.length) {
+    const order = [...kept].sort((a, b) => spec.keepHigh ? b.value - a.value : a.value - b.value);
+    const keepSet = new Set(order.slice(0, spec.keep).map(r => r.index));
+    kept = kept.map(r => ({ ...r, keep: keepSet.has(r.index) }));
+  }
+
+  const total = kept.filter(r => r.keep).reduce((s, r) => s + r.value, 0) + spec.modifier;
+  return { rolls: kept, total, spec };
+}
+
+function render(result) {
+  const { rolls, total, spec } = result;
+  $("total").textContent = total;
+  $("total").className = "total";
+
+  const parts = rolls.map(r =>
+    `<span class="${r.keep ? "kept" : "dropped"}">${r.value}${r.exploded ? "!" : ""}</span>`);
+  const mod = spec.modifier ? ` ${spec.modifier > 0 ? "+" : "−"} ${Math.abs(spec.modifier)}` : "";
+  $("detail").innerHTML = `[ ${parts.join(", ")} ]${mod}`;
+
+  // A single d20 is the one case where the individual die matters more than
+  // the total, so it gets called out.
+  let verdict = "";
+  const singles = rolls.filter(r => r.keep);
+  if (spec.sides === 20 && singles.length === 1) {
+    if (singles[0].value === 20) { verdict = "Natural 20."; $("total").classList.add("crit"); }
+    else if (singles[0].value === 1) { verdict = "Natural 1."; $("total").classList.add("fumble"); }
+  }
+  if (spec.mode) verdict += (verdict ? " " : "") + (spec.mode === "adv" ? "With advantage." : "With disadvantage.");
+  $("verdict").textContent = verdict;
+
+  const line = `${$("expr").value.trim()} → ${total}  [${rolls.map(r => r.value).join(",")}]`;
+  $("log").innerHTML = line + "<br>" + $("log").innerHTML;
+}
+
+function go() {
+  try {
+    render(evaluate(parse($("expr").value)));
+  } catch (e) {
+    $("total").textContent = "—"; $("total").className = "total";
+    $("detail").innerHTML = `<span class="err">${e.message}</span>`;
+    $("verdict").textContent = "";
+  }
+}
+
+$("quick").innerHTML = ["d20", "d20adv", "d20dis", "4d6kh3", "2d6", "3d8+2", "d100", "4d6!"]
+  .map(e => `<button data-e="${e}">${e}</button>`).join("");
+$("quick").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  $("expr").value = b.dataset.e; go();
+};
+$("expr").addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+
+// ---- cards ----------------------------------------------------------------
+const SUITS = [["♠","black"],["♥","red"],["♦","red"],["♣","black"]];
+const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+let deck = [], withJokers = false;
+
+function freshDeck() {
+  deck = [];
+  for (const [suit, colour] of SUITS)
+    for (const rank of RANKS) deck.push({ rank, suit, colour });
+  if (withJokers) deck.push({ rank: "★", suit: "", colour: "red" }, { rank: "★", suit: "", colour: "black" });
+  // Fisher-Yates with crypto randomness. sort(() => Math.random() - 0.5) is
+  // the common shortcut and it does not produce a uniform shuffle.
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = roll(i + 1) - 1;
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  $("hand").innerHTML = "";
+  updateCount();
+}
+
+function drawCards(n) {
+  const drawn = [];
+  for (let i = 0; i < n && deck.length; i++) drawn.push(deck.pop());
+  if (!drawn.length) { $("count").textContent = "The deck is empty — shuffle a fresh one."; return; }
+  $("hand").innerHTML += drawn.map(c =>
+    `<div class="pc ${c.colour === "red" ? "red" : ""}">
+       <small>${c.suit}</small>${c.rank}
+     </div>`).join("");
+  updateCount();
+}
+
+function updateCount() {
+  $("count").textContent = `${deck.length} card${deck.length === 1 ? "" : "s"} left in the deck.`;
+}
+
+$("draw1").onclick = () => drawCards(1);
+$("draw5").onclick = () => drawCards(5);
+$("shuffle").onclick = freshDeck;
+$("jokers").onclick = () => {
+  withJokers = !withJokers;
+  $("jokers").textContent = "Jokers: " + (withJokers ? "on" : "off");
+  freshDeck();
+};
+
+function tab(which) {
+  $("tabDice").setAttribute("aria-selected", which === "dice");
+  $("tabCards").setAttribute("aria-selected", which === "cards");
+  $("dicePanel").hidden = which !== "dice";
+  $("cardsPanel").hidden = which !== "cards";
+}
+$("tabDice").onclick = () => tab("dice");
+$("tabCards").onclick = () => tab("cards");
+
+freshDeck();
+go();
+</script>
+</body>
+</html>

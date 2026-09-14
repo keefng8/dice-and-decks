@@ -1,0 +1,7 @@
+{
+  "name": "Dice and Decks",
+  "description": "Dice notation that actually works - 4d6kh3, 2d20adv, exploding dice - plus a card deck with draw and shuffle. For tabletop nights when the dice are in the other room.",
+  "entry": "index.html",
+  "category": "Gaming",
+  "keywords": ["open dice and decks", "roll some dice", "roll 2d20", "draw a card"]
+}
